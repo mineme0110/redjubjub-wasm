@@ -2,6 +2,22 @@
 
 A web application demonstrating JubJub curve signatures using Rust WebAssembly and Next.js.
 
+## Project Structure 
+
+project/
+├── rust-jubjub-wasm/          # Rust WASM library
+│   ├── src/
+│   │   └── lib.rs            # Rust implementation for jubjub keys
+│   ├── Cargo.toml
+│   └── Cargo.lock
+└── jubjub-signature-app/     # Next.js frontend
+    ├── src/
+    │   ├── app/
+    │   │   └── page.tsx
+    │   ├── components/
+    │   │   └── SignatureComponent.tsx
+    │   └── wasm/            # Compiled WASM files
+    └── next.config.js
 
 ## Prerequisites
 
@@ -10,36 +26,55 @@ A web application demonstrating JubJub curve signatures using Rust WebAssembly a
 - [Node.js](https://nodejs.org/) (v16 or later)
 - [npm](https://www.npmjs.com/) (comes with Node.js)
 
-## Setup Instructions
+## Setup Instructions After Cloning
 
 1. **Build the Rust WASM Library**
-In the rust project directory
 ```bash
+# In the rust project root directory
 wasm-pack build --target web
 ```
 
-2. **Copy WASM Files**
- This will create pkg folder with the wasm files
-
-Create wasm directory in Next.js app
-
+2. **Set up the Next.js Application**
 ```bash
+# Navigate to the Next.js app directory
+cd jubjub-signature-app
+
+# Install dependencies
+npm install
+
+# Create wasm directory if it doesn't exist
 mkdir -p src/wasm
+
+# Copy WASM files from rust project
+cp -r ../pkg/* src/wasm/
 ```
 
-Copy WASM files
-
+3. **Run the Development Server**
 ```bash
-cp -r pkg/ jubjub-signature-app/src/wasm/
-```
-
-4. **Run the Development Server**
-```bash
+# In the jubjub-signature-app directory
 npm run dev
 ```
 
-
 The application will be available at [http://localhost:3000](http://localhost:3000)
+
+## Common Setup Issues
+
+1. **Missing WASM Files**
+   - Ensure you've run `wasm-pack build --target web` in the root directory
+   - Check that all files from `pkg/` are copied to `jubjub-signature-app/src/wasm/`
+
+2. **Node Modules Issues**
+   - If you encounter module-related errors, try:
+     ```bash
+     cd jubjub-signature-app
+     rm -rf node_modules
+     rm package-lock.json
+     npm install
+     ```
+
+3. **WASM Loading Issues**
+   - Verify `next.config.js` has the correct WASM configuration
+   - Check browser console for WASM-related errors
 
 ## Usage
 
@@ -74,3 +109,11 @@ To make changes to the Rust code:
 
 1. Modify the Rust code in `src/lib.rs`
 2. Rebuild the WASM package:
+```bash
+wasm-pack build --target web
+```
+3. Copy the new WASM files to the Next.js app:
+```bash
+cp -r pkg/* jubjub-signature-app/src/wasm/
+```
+4. Restart the Next.js development server
