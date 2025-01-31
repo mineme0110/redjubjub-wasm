@@ -14,7 +14,9 @@ A web application demonstrating JubJub curve signatures using Rust WebAssembly a
 
 1. **Build the Rust WASM Library**
 In the rust project directory
-```wasm-pack build --target web``
+```bash
+wasm-pack build --target web
+```
 
 2. **Copy WASM Files**
  This will create pkg folder with the wasm files
