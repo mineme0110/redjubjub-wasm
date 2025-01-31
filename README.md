@@ -3,7 +3,7 @@
 A web application demonstrating JubJub curve signatures using Rust WebAssembly and Next.js.
 
 ## Project Structure 
-
+```
 project/
 ├── rust-jubjub-wasm/          # Rust WASM library
 │   ├── src/
@@ -18,7 +18,7 @@ project/
     │   │   └── SignatureComponent.tsx
     │   └── wasm/            # Compiled WASM files
     └── next.config.js
-
+```
 ## Prerequisites
 
 - [Rust](https://rustup.rs/) (latest stable)
