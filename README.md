@@ -23,10 +23,15 @@ wasm-pack build --target web
 
 Create wasm directory in Next.js app
 
-mkdir -p jubjub-signature-app/src/wasm
+```bash
+mkdir -p src/wasm
+```
 
 Copy WASM files
+
+```bash
 cp -r pkg/ jubjub-signature-app/src/wasm/
+```
 
 4. **Run the Development Server**
 ```bash
