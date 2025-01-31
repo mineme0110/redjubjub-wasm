@@ -1,0 +1,14 @@
+[package]
+name = "redjubjub-wasm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+redjubjub = "0.7"
+rand = { version = "0.8", features = ["getrandom"] }
+getrandom = { version = "0.2", features = ["js"] }
+js-sys = "0.3"
