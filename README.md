@@ -2,22 +2,6 @@
 
 A web application demonstrating JubJub curve signatures using Rust WebAssembly and Next.js.
 
-## Project Structure 
-
-project/
-├── rust-jubjub-wasm/ # Rust WASM library
-│ ├── src/
-│ │ └── lib.rs # Rust implementation for jubjub keys
-│ ├── Cargo.toml
-│ └── Cargo.lock
-└── jubjub-signature-app/ # Next.js frontend
-├── src/
-│ ├── app/
-│ │ └── page.tsx
-│ ├── components/
-│ │ └── SignatureComponent.tsx
-│ └── wasm/ # Compiled WASM files
-└── next.config.js
 
 ## Prerequisites
 
