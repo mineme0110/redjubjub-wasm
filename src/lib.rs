@@ -1,4 +1,4 @@
-use bip39::{Language, Mnemonic};
+use bip39::{Language, Mnemonic, MnemonicType, Seed};
 use rand::rngs::OsRng;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -19,42 +19,6 @@ impl KeyPair {
         KeyPair { private, public }
     }
 
-    pub fn from_seed(seed: &[u8]) -> Self {
-        // Create a deterministic RNG from the seed
-        let mut rng = StdRng::from_seed(seed.try_into().expect("Seed must be 32 bytes"));
-        let private = SigningKey::<Binding>::new(&mut rng);
-        let public = VerificationKey::from(&private);
-        KeyPair { private, public }
-    }
-
-    pub fn from_mnemonic(mnemonic: &str) -> Result<Self, String> {
-        let mnemonic = Mnemonic::parse_in(Language::English, mnemonic)
-            .map_err(|e| format!("Invalid mnemonic phrase: {}", e))?;
-
-        let seed = mnemonic.to_seed("");
-
-        let seed_bytes: [u8; 32] = seed[..32]
-            .try_into()
-            .map_err(|_| "Failed to convert seed to 32 bytes")?;
-
-        Ok(Self::from_seed(&seed_bytes))
-    }
-
-    pub fn generate_mnemonic() -> String {
-        let entropy = rand::random::<[u8; 32]>();
-        let mnemonic = Mnemonic::from_entropy(&entropy).expect("Failed to generate mnemonic");
-        mnemonic.to_string()
-    }
-
-    pub fn format_mnemonic(mnemonic: &str) -> String {
-        mnemonic
-            .split_whitespace()
-            .enumerate()
-            .map(|(i, word)| format!("{:2}. {}", i + 1, word))
-            .collect::<Vec<String>>()
-            .join("\n")
-    }
-
     pub fn sign(&self, message: &[u8]) -> Vec<u8> {
         let sig = self.private.sign(&mut OsRng, message);
         let sig_bytes: [u8; 64] = sig.into();
@@ -70,6 +34,40 @@ impl KeyPair {
     pub fn public_key(&self) -> Vec<u8> {
         let pk: [u8; 32] = self.public.into();
         pk.to_vec()
+    }
+
+    pub fn from_mnemonic(mnemonic: &str) -> Result<KeyPair, String> {
+        let mnemonic = Mnemonic::from_phrase(mnemonic, Language::English)
+            .map_err(|e| format!("Invalid mnemonic phrase: {:?}", e))?;
+
+        let seed = Seed::new(&mnemonic, "");
+
+        let seed_bytes: [u8; 32] = seed.as_bytes()[..32]
+            .try_into()
+            .map_err(|_| "Failed to convert seed to 32 bytes")?;
+
+        Ok(Self::from_seed(&seed_bytes))
+    }
+
+    fn from_seed(seed: &[u8]) -> Self {
+        let mut rng = StdRng::from_seed(seed.try_into().expect("Seed must be 32 bytes"));
+        let private = SigningKey::<Binding>::new(&mut rng);
+        let public = VerificationKey::from(&private);
+        KeyPair { private, public }
+    }
+
+    pub fn generate_mnemonic() -> String {
+        let mnemonic = Mnemonic::new(MnemonicType::Words24, Language::English);
+        mnemonic.to_string()
+    }
+
+    pub fn format_mnemonic(mnemonic: &str) -> String {
+        mnemonic
+            .split_whitespace()
+            .enumerate()
+            .map(|(i, word)| format!("{:2}. {}", i + 1, word))
+            .collect::<Vec<String>>()
+            .join("\n")
     }
 }
 
@@ -106,15 +104,9 @@ mod tests {
         assert!(!mnemonic.is_empty());
 
         // Create keypair from mnemonic
-        let keypair1 =
+        let keypair =
             KeyPair::from_mnemonic(&mnemonic).expect("Failed to create keypair from mnemonic");
-
-        // Recover the same keypair from the same mnemonic
-        let keypair2 =
-            KeyPair::from_mnemonic(&mnemonic).expect("Failed to recover keypair from mnemonic");
-
-        // Verify both keypairs are identical
-        assert_eq!(keypair1.public_key(), keypair2.public_key());
+        assert_eq!(keypair.public_key().len(), 32);
 
         // Test with invalid mnemonic
         let invalid_mnemonic = "invalid mnemonic phrase";
@@ -136,6 +128,51 @@ mod tests {
 
         let wrong_signature = vec![0u8; 64];
         assert!(!keypair.verify(message, &wrong_signature));
+    }
+
+    #[test]
+    fn test_sign_and_verify_with_mnemonic() {
+        let mnemonic = "spread struggle twice like memory profit artefact chimney climb burger fatigue mixed trap weird melody clump total ridge shine observe reward swap vast friend";
+
+        let keypair =
+            KeyPair::from_mnemonic(mnemonic).expect("Failed to create keypair from mnemonic");
+
+        let message = b"Test message for mnemonic-derived key";
+        let signature = keypair.sign(message);
+
+        assert!(keypair.verify(message, &signature));
+
+        let keypair2 = KeyPair::from_mnemonic(mnemonic).expect("Failed to create second keypair");
+        assert_eq!(keypair.public_key(), keypair2.public_key());
+
+        assert!(keypair2.verify(message, &signature));
+
+        let wrong_message = b"Wrong message for mnemonic-derived key";
+        assert!(!keypair.verify(wrong_message, &signature));
+    }
+
+    #[test]
+    fn test_deterministic_key_derivation() {
+        let mnemonic = "spread struggle twice like memory profit artefact chimney climb burger fatigue mixed trap weird melody clump total ridge shine observe reward swap vast friend";
+
+        let keypair1 = KeyPair::from_mnemonic(mnemonic).expect("Failed to create first keypair");
+        let keypair2 = KeyPair::from_mnemonic(mnemonic).expect("Failed to create second keypair");
+
+        assert_eq!(keypair1.public_key(), keypair2.public_key());
+
+        let message = b"Test message for deterministic derivation";
+        let signature = keypair1.sign(message);
+
+        assert!(keypair1.verify(message, &signature));
+        assert!(keypair2.verify(message, &signature));
+
+        let different_mnemonic = "man boy oxygen bind opera spread wagon valve trumpet unaware ski sample entire obvious early trash kick trust dove mercy call salon dutch dirt";
+        let different_keypair =
+            KeyPair::from_mnemonic(different_mnemonic).expect("Failed to create different keypair");
+
+        assert_ne!(keypair1.public_key(), different_keypair.public_key());
+
+        assert!(!different_keypair.verify(message, &signature));
     }
 
     #[test]
