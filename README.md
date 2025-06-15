@@ -1,6 +1,6 @@
-# JubJub Signature Demo
+# RedJubjub WebAssembly Demo
 
-A web application demonstrating JubJub curve signatures using Rust WebAssembly and Next.js.
+A web application demonstrating RedJubjub curve signatures using Rust WebAssembly and Next.js, with support for mnemonic phrase-based key generation.
 
 ## Project Structure 
 ```
@@ -19,6 +19,16 @@ project/
     │   └── wasm/            # Compiled WASM files
     └── next.config.js
 ```
+
+## Features
+
+- Generate RedJubjub keypairs
+- Sign messages using RedJubjub signatures
+- Verify signatures
+- Generate and use BIP39 mnemonic phrases
+- Display public and private keys in hex format
+- TypeScript support for type safety
+
 ## Prerequisites
 
 - [Rust](https://rustup.rs/) (latest stable)
@@ -26,7 +36,7 @@ project/
 - [Node.js](https://nodejs.org/) (v16 or later)
 - [npm](https://www.npmjs.com/) (comes with Node.js)
 
-## Setup Instructions After Cloning
+## Setup Instructions
 
 1. **Build the Rust WASM Library**
 ```bash
@@ -57,51 +67,177 @@ npm run dev
 
 The application will be available at [http://localhost:3000](http://localhost:3000)
 
-## Common Setup Issues
+## TypeScript API Usage
 
-1. **Missing WASM Files**
-   - Ensure you've run `wasm-pack build --target web` in the root directory
-   - Check that all files from `pkg/` are copied to `jubjub-signature-app/src/wasm/`
+### Basic Setup
 
-2. **Node Modules Issues**
-   - If you encounter module-related errors, try:
-     ```bash
-     cd jubjub-signature-app
-     rm -rf node_modules
-     rm package-lock.json
-     npm install
-     ```
+```typescript
+import { KeyPair } from '../wasm/redjubjub_wasm';
 
-3. **WASM Loading Issues**
-   - Verify `next.config.js` has the correct WASM configuration
-   - Check browser console for WASM-related errors
+// Initialize the WASM module
+await KeyPair.init();
+```
 
-## Usage
+### Key Generation and Management
 
-1. Click "Generate Keypair" to create a new JubJub keypair
-2. Enter a message in the input field
-3. Click "Sign Message" to create a signature
-4. Click "Verify Signature" to verify the signature
+```typescript
+// Generate a new random key pair
+const keypair = KeyPair.generate();
 
-## Features
+// Get the public key as a hex string
+const publicKey = Buffer.from(keypair.public_key()).toString('hex');
 
-- Generate JubJub keypairs
-- Sign messages using JubJub signatures
-- Verify signatures
-- Display public keys and signatures in hex format
+// Get the private key as a hex string
+const privateKey = Buffer.from(keypair.private_key()).toString('hex');
 
-## Technical Details
+// Generate a new mnemonic phrase
+const mnemonic = KeyPair.generate_mnemonic();
 
-### Rust WASM Library
-- Uses the JubJub elliptic curve for signatures
-- Compiled to WebAssembly using wasm-pack
-- Exports KeyPair generation, signing, and verification functions
+// Format mnemonic with word numbers
+const formattedMnemonic = KeyPair.format_mnemonic(mnemonic);
+console.log(formattedMnemonic);
+// Output:
+//  1. word1
+//  2. word2
+//  ...
 
-### Next.js Frontend
-- Built with Next.js 13+ App Router
-- Uses TypeScript for type safety
-- Tailwind CSS for styling
-- WebAssembly integration for cryptographic operations
+// Create a key pair from a mnemonic phrase
+const keypairFromMnemonic = KeyPair.from_mnemonic(mnemonic);
+```
+
+### Signing and Verification
+
+```typescript
+// Sign a message
+const message = new TextEncoder().encode("Hello, World!");
+const signature = keypair.sign(message);
+const signatureHex = Buffer.from(signature).toString('hex');
+
+// Verify a signature
+const isValid = keypair.verify(message, signature);
+```
+
+### Complete Example Component
+
+```typescript
+import { useState, useEffect } from 'react';
+import { KeyPair } from '../wasm/redjubjub_wasm';
+
+export function SignatureComponent() {
+  const [keypair, setKeypair] = useState<KeyPair | null>(null);
+  const [publicKey, setPublicKey] = useState<string>('');
+  const [privateKey, setPrivateKey] = useState<string>('');
+  const [message, setMessage] = useState<string>('');
+  const [signature, setSignature] = useState<string>('');
+  const [mnemonic, setMnemonic] = useState<string>('');
+
+  useEffect(() => {
+    // Initialize WASM
+    KeyPair.init().then(() => {
+      // Generate initial keypair
+      const newKeypair = KeyPair.generate();
+      setKeypair(newKeypair);
+      setPublicKey(Buffer.from(newKeypair.public_key()).toString('hex'));
+      setPrivateKey(Buffer.from(newKeypair.private_key()).toString('hex'));
+    });
+  }, []);
+
+  const generateNewKeypair = () => {
+    const newKeypair = KeyPair.generate();
+    setKeypair(newKeypair);
+    setPublicKey(Buffer.from(newKeypair.public_key()).toString('hex'));
+    setPrivateKey(Buffer.from(newKeypair.private_key()).toString('hex'));
+    setSignature('');
+  };
+
+  const generateMnemonic = () => {
+    const newMnemonic = KeyPair.generate_mnemonic();
+    setMnemonic(newMnemonic);
+    const newKeypair = KeyPair.from_mnemonic(newMnemonic);
+    setKeypair(newKeypair);
+    setPublicKey(Buffer.from(newKeypair.public_key()).toString('hex'));
+    setPrivateKey(Buffer.from(newKeypair.private_key()).toString('hex'));
+  };
+
+  const signMessage = () => {
+    if (!keypair || !message) return;
+    const messageBytes = new TextEncoder().encode(message);
+    const sig = keypair.sign(messageBytes);
+    setSignature(Buffer.from(sig).toString('hex'));
+  };
+
+  const verifySignature = () => {
+    if (!keypair || !message || !signature) return;
+    const messageBytes = new TextEncoder().encode(message);
+    const sigBytes = Buffer.from(signature, 'hex');
+    const isValid = keypair.verify(messageBytes, sigBytes);
+    alert(isValid ? 'Signature is valid!' : 'Signature is invalid!');
+  };
+
+  return (
+    <div>
+      <button onClick={generateNewKeypair}>Generate New Keypair</button>
+      <button onClick={generateMnemonic}>Generate Mnemonic</button>
+      
+      {mnemonic && (
+        <div>
+          <h3>Mnemonic Phrase:</h3>
+          <pre>{KeyPair.format_mnemonic(mnemonic)}</pre>
+        </div>
+      )}
+
+      <div>
+        <h3>Public Key:</h3>
+        <pre>{publicKey}</pre>
+      </div>
+
+      <div>
+        <h3>Private Key:</h3>
+        <pre>{privateKey}</pre>
+      </div>
+
+      <div>
+        <input
+          type="text"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Enter message to sign"
+        />
+        <button onClick={signMessage}>Sign Message</button>
+      </div>
+
+      {signature && (
+        <div>
+          <h3>Signature:</h3>
+          <pre>{signature}</pre>
+          <button onClick={verifySignature}>Verify Signature</button>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## Common Issues and Solutions
+
+1. **WASM Loading Issues**
+   - Ensure `next.config.js` has the correct WASM configuration:
+   ```javascript
+   const nextConfig = {
+     webpack: (config) => {
+       config.experiments = { asyncWebAssembly: true };
+       return config;
+     },
+   };
+   ```
+
+2. **TypeScript Type Definitions**
+   - The WASM module includes TypeScript definitions
+   - Import types from the generated `.d.ts` file
+
+3. **Memory Management**
+   - The WASM module handles memory cleanup automatically
+   - No manual memory management required
 
 ## Development
 
@@ -117,3 +253,14 @@ wasm-pack build --target web
 cp -r pkg/* jubjub-signature-app/src/wasm/
 ```
 4. Restart the Next.js development server
+
+## Security Considerations
+
+- Private keys should be handled securely and never exposed in logs or error messages
+- When using in a web browser, consider the security implications of storing private keys
+- Use appropriate key storage mechanisms for your use case
+- Consider using a secure key management system for production environments
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details. 
