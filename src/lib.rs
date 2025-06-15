@@ -13,29 +13,34 @@ pub struct KeyPair {
 
 #[wasm_bindgen]
 impl KeyPair {
+    #[inline]
     pub fn generate() -> Self {
         let private = SigningKey::<Binding>::new(OsRng);
         let public = VerificationKey::from(&private);
         KeyPair { private, public }
     }
 
+    #[inline]
     pub fn sign(&self, message: &[u8]) -> Vec<u8> {
         let sig = self.private.sign(&mut OsRng, message);
         let sig_bytes: [u8; 64] = sig.into();
         sig_bytes.to_vec()
     }
 
+    #[inline]
     pub fn verify(&self, message: &[u8], signature: &[u8]) -> bool {
         let sig_bytes: [u8; 64] = signature.try_into().expect("Invalid signature length");
         let sig: Signature<Binding> = sig_bytes.into();
         self.public.verify(message, &sig).is_ok()
     }
 
+    #[inline]
     pub fn public_key(&self) -> Vec<u8> {
         let pk: [u8; 32] = self.public.into();
         pk.to_vec()
     }
 
+    #[inline]
     pub fn private_key(&self) -> Vec<u8> {
         let sk: [u8; 32] = self.private.into();
         sk.to_vec()
@@ -46,7 +51,6 @@ impl KeyPair {
             .map_err(|e| format!("Invalid mnemonic phrase: {:?}", e))?;
 
         let seed = Seed::new(&mnemonic, "");
-
         let seed_bytes: [u8; 32] = seed.as_bytes()[..32]
             .try_into()
             .map_err(|_| "Failed to convert seed to 32 bytes")?;
@@ -54,6 +58,7 @@ impl KeyPair {
         Ok(Self::from_seed(&seed_bytes))
     }
 
+    #[inline]
     fn from_seed(seed: &[u8]) -> Self {
         let mut rng = StdRng::from_seed(seed.try_into().expect("Seed must be 32 bytes"));
         let private = SigningKey::<Binding>::new(&mut rng);
@@ -61,11 +66,13 @@ impl KeyPair {
         KeyPair { private, public }
     }
 
+    #[inline]
     pub fn generate_mnemonic() -> String {
         let mnemonic = Mnemonic::new(MnemonicType::Words24, Language::English);
         mnemonic.to_string()
     }
 
+    #[inline]
     pub fn format_mnemonic(mnemonic: &str) -> String {
         mnemonic
             .split_whitespace()
@@ -94,11 +101,13 @@ mod tests {
         let keypair2 = KeyPair::from_seed(&seed);
 
         assert_eq!(keypair1.public_key(), keypair2.public_key());
+        assert_eq!(keypair1.private_key(), keypair2.private_key());
 
         // Test that different seeds produce different keypairs
         let seed2 = [2u8; 32];
         let keypair3 = KeyPair::from_seed(&seed2);
         assert_ne!(keypair1.public_key(), keypair3.public_key());
+        assert_ne!(keypair1.private_key(), keypair3.private_key());
     }
 
     #[test]
@@ -112,6 +121,7 @@ mod tests {
         let keypair =
             KeyPair::from_mnemonic(&mnemonic).expect("Failed to create keypair from mnemonic");
         assert_eq!(keypair.public_key().len(), 32);
+        assert_eq!(keypair.private_key().len(), 32);
 
         // Test with invalid mnemonic
         let invalid_mnemonic = "invalid mnemonic phrase";
@@ -149,6 +159,7 @@ mod tests {
 
         let keypair2 = KeyPair::from_mnemonic(mnemonic).expect("Failed to create second keypair");
         assert_eq!(keypair.public_key(), keypair2.public_key());
+        assert_eq!(keypair.private_key(), keypair2.private_key());
 
         assert!(keypair2.verify(message, &signature));
 
@@ -180,22 +191,6 @@ mod tests {
         assert_ne!(keypair1.private_key(), different_keypair.private_key());
 
         assert!(!different_keypair.verify(message, &signature));
-    }
-
-    #[test]
-    fn test_private_key_generation() {
-        let keypair = KeyPair::generate();
-        let private_key = keypair.private_key();
-
-        // Check private key length
-        assert_eq!(private_key.len(), 32);
-
-        // Check that private key is not all zeros
-        assert_ne!(private_key, vec![0u8; 32]);
-
-        // Check that private key is different for different keypairs
-        let keypair2 = KeyPair::generate();
-        assert_ne!(private_key, keypair2.private_key());
     }
 
     #[test]
