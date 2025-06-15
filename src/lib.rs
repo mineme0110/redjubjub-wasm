@@ -36,6 +36,11 @@ impl KeyPair {
         pk.to_vec()
     }
 
+    pub fn private_key(&self) -> Vec<u8> {
+        let sk: [u8; 32] = self.private.into();
+        sk.to_vec()
+    }
+
     pub fn from_mnemonic(mnemonic: &str) -> Result<KeyPair, String> {
         let mnemonic = Mnemonic::from_phrase(mnemonic, Language::English)
             .map_err(|e| format!("Invalid mnemonic phrase: {:?}", e))?;
@@ -159,6 +164,7 @@ mod tests {
         let keypair2 = KeyPair::from_mnemonic(mnemonic).expect("Failed to create second keypair");
 
         assert_eq!(keypair1.public_key(), keypair2.public_key());
+        assert_eq!(keypair1.private_key(), keypair2.private_key());
 
         let message = b"Test message for deterministic derivation";
         let signature = keypair1.sign(message);
@@ -171,8 +177,25 @@ mod tests {
             KeyPair::from_mnemonic(different_mnemonic).expect("Failed to create different keypair");
 
         assert_ne!(keypair1.public_key(), different_keypair.public_key());
+        assert_ne!(keypair1.private_key(), different_keypair.private_key());
 
         assert!(!different_keypair.verify(message, &signature));
+    }
+
+    #[test]
+    fn test_private_key_generation() {
+        let keypair = KeyPair::generate();
+        let private_key = keypair.private_key();
+
+        // Check private key length
+        assert_eq!(private_key.len(), 32);
+
+        // Check that private key is not all zeros
+        assert_ne!(private_key, vec![0u8; 32]);
+
+        // Check that private key is different for different keypairs
+        let keypair2 = KeyPair::generate();
+        assert_ne!(private_key, keypair2.private_key());
     }
 
     #[test]

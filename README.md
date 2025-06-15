@@ -26,7 +26,7 @@ project/
 - Sign messages using RedJubjub signatures
 - Verify signatures
 - Generate and use BIP39 mnemonic phrases
-- Display public keys and signatures in hex format
+- Display public and private keys in hex format
 - TypeScript support for type safety
 
 ## Prerequisites
@@ -87,6 +87,9 @@ const keypair = KeyPair.generate();
 // Get the public key as a hex string
 const publicKey = Buffer.from(keypair.public_key()).toString('hex');
 
+// Get the private key as a hex string
+const privateKey = Buffer.from(keypair.private_key()).toString('hex');
+
 // Generate a new mnemonic phrase
 const mnemonic = KeyPair.generate_mnemonic();
 
@@ -123,6 +126,7 @@ import { KeyPair } from '../wasm/redjubjub_wasm';
 export function SignatureComponent() {
   const [keypair, setKeypair] = useState<KeyPair | null>(null);
   const [publicKey, setPublicKey] = useState<string>('');
+  const [privateKey, setPrivateKey] = useState<string>('');
   const [message, setMessage] = useState<string>('');
   const [signature, setSignature] = useState<string>('');
   const [mnemonic, setMnemonic] = useState<string>('');
@@ -134,6 +138,7 @@ export function SignatureComponent() {
       const newKeypair = KeyPair.generate();
       setKeypair(newKeypair);
       setPublicKey(Buffer.from(newKeypair.public_key()).toString('hex'));
+      setPrivateKey(Buffer.from(newKeypair.private_key()).toString('hex'));
     });
   }, []);
 
@@ -141,6 +146,7 @@ export function SignatureComponent() {
     const newKeypair = KeyPair.generate();
     setKeypair(newKeypair);
     setPublicKey(Buffer.from(newKeypair.public_key()).toString('hex'));
+    setPrivateKey(Buffer.from(newKeypair.private_key()).toString('hex'));
     setSignature('');
   };
 
@@ -150,6 +156,7 @@ export function SignatureComponent() {
     const newKeypair = KeyPair.from_mnemonic(newMnemonic);
     setKeypair(newKeypair);
     setPublicKey(Buffer.from(newKeypair.public_key()).toString('hex'));
+    setPrivateKey(Buffer.from(newKeypair.private_key()).toString('hex'));
   };
 
   const signMessage = () => {
@@ -182,6 +189,11 @@ export function SignatureComponent() {
       <div>
         <h3>Public Key:</h3>
         <pre>{publicKey}</pre>
+      </div>
+
+      <div>
+        <h3>Private Key:</h3>
+        <pre>{privateKey}</pre>
       </div>
 
       <div>
@@ -241,6 +253,13 @@ wasm-pack build --target web
 cp -r pkg/* jubjub-signature-app/src/wasm/
 ```
 4. Restart the Next.js development server
+
+## Security Considerations
+
+- Private keys should be handled securely and never exposed in logs or error messages
+- When using in a web browser, consider the security implications of storing private keys
+- Use appropriate key storage mechanisms for your use case
+- Consider using a secure key management system for production environments
 
 ## License
 
