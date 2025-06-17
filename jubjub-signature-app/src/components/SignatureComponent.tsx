@@ -13,6 +13,9 @@ export default function SignatureComponent() {
     const [isValid, setIsValid] = useState<boolean | null>(null);
     const [mnemonic, setMnemonic] = useState('');
     const [formattedMnemonic, setFormattedMnemonic] = useState('');
+    const [privateKeyInput, setPrivateKeyInput] = useState('');
+    const [publicKeyInput, setPublicKeyInput] = useState('');
+    const [errorMessage, setErrorMessage] = useState('');
 
     useEffect(() => {
         console.log('Initializing WASM...');
@@ -33,12 +36,15 @@ export default function SignatureComponent() {
             setKeyPair(newKeyPair);
             const pubKey = newKeyPair.public_key();
             const pubKeyHex = Buffer.from(pubKey).toString('hex');
+            const privKeyHex = Buffer.from(newKeyPair.private_key()).toString('hex');
             console.log('Generated public key:', pubKeyHex);
             setPublicKey(pubKeyHex);
-            setPrivateKey('private key generated'); // Just an indicator since we don't expose private key
+            setPrivateKey(privKeyHex);
+            setErrorMessage('');
             console.log('Keypair generated successfully');
         } catch (error) {
             console.error('Error generating keys:', error);
+            setErrorMessage('Error generating keys');
         }
     };
 
@@ -49,9 +55,11 @@ export default function SignatureComponent() {
             setMnemonic(newMnemonic);
             const formatted = KeyPair.format_mnemonic(newMnemonic);
             setFormattedMnemonic(formatted);
+            setErrorMessage('');
             console.log('Generated mnemonic:', formatted);
         } catch (error) {
             console.error('Error generating mnemonic:', error);
+            setErrorMessage('Error generating mnemonic');
         }
     };
 
@@ -67,12 +75,72 @@ export default function SignatureComponent() {
                 setKeyPair(newKeyPair);
                 const pubKey = newKeyPair.public_key();
                 const pubKeyHex = Buffer.from(pubKey).toString('hex');
+                const privKeyHex = Buffer.from(newKeyPair.private_key()).toString('hex');
                 setPublicKey(pubKeyHex);
-                setPrivateKey('private key generated from mnemonic');
+                setPrivateKey(privKeyHex);
+                setErrorMessage('');
                 console.log('Keypair created from mnemonic successfully');
             }
         } catch (error) {
             console.error('Error creating keypair from mnemonic:', error);
+            setErrorMessage('Error creating keypair from mnemonic');
+        }
+    };
+
+    const handleCreateFromPrivateKey = () => {
+        console.log('Creating keypair from private key...');
+        try {
+            if (!privateKeyInput) {
+                setErrorMessage('Please enter a private key');
+                return;
+            }
+
+            // Convert hex string to bytes
+            const privateKeyBytes = Buffer.from(privateKeyInput.replace(/\s/g, ''), 'hex');
+
+            const newKeyPair = KeyPair.from_private_key_bytes(privateKeyBytes);
+            if (newKeyPair) {
+                setKeyPair(newKeyPair);
+                const pubKey = newKeyPair.public_key();
+                const pubKeyHex = Buffer.from(pubKey).toString('hex');
+                const privKeyHex = Buffer.from(newKeyPair.private_key()).toString('hex');
+                setPublicKey(pubKeyHex);
+                setPrivateKey(privKeyHex);
+                setErrorMessage('');
+                console.log('Keypair created from private key successfully');
+            }
+        } catch (error) {
+            console.error('Error creating keypair from private key:', error);
+            setErrorMessage('Error creating keypair from private key');
+        }
+    };
+
+    const handleCreateFromKeyBytes = () => {
+        console.log('Creating keypair from key bytes...');
+        try {
+            if (!privateKeyInput || !publicKeyInput) {
+                setErrorMessage('Please enter both private and public keys');
+                return;
+            }
+
+            // Convert hex strings to bytes
+            const privateKeyBytes = Buffer.from(privateKeyInput.replace(/\s/g, ''), 'hex');
+            const publicKeyBytes = Buffer.from(publicKeyInput.replace(/\s/g, ''), 'hex');
+
+            const newKeyPair = KeyPair.from_key_bytes(privateKeyBytes, publicKeyBytes);
+            if (newKeyPair) {
+                setKeyPair(newKeyPair);
+                const pubKey = newKeyPair.public_key();
+                const pubKeyHex = Buffer.from(pubKey).toString('hex');
+                const privKeyHex = Buffer.from(newKeyPair.private_key()).toString('hex');
+                setPublicKey(pubKeyHex);
+                setPrivateKey(privKeyHex);
+                setErrorMessage('');
+                console.log('Keypair created from key bytes successfully');
+            }
+        } catch (error) {
+            console.error('Error creating keypair from key bytes:', error);
+            setErrorMessage('Error creating keypair from key bytes');
         }
     };
 
@@ -93,8 +161,10 @@ export default function SignatureComponent() {
             const sigHex = Buffer.from(sig).toString('hex');
             console.log('Generated signature:', sigHex);
             setSignature(sigHex);
+            setErrorMessage('');
         } catch (error) {
             console.error('Error signing message:', error);
+            setErrorMessage('Error signing message');
         }
     };
 
@@ -114,8 +184,10 @@ export default function SignatureComponent() {
             const valid = keyPair.verify(messageBytes, signatureBytes);
             console.log('Signature verification result:', valid);
             setIsValid(valid);
+            setErrorMessage('');
         } catch (error) {
             console.error('Error verifying signature:', error);
+            setErrorMessage('Error verifying signature');
         }
     };
 
@@ -134,48 +206,110 @@ export default function SignatureComponent() {
     }
 
     return (
-        <div className="max-w-2xl mx-auto p-4 space-y-6">
+        <div className="max-w-4xl mx-auto p-4 space-y-6">
             <h1 className="text-2xl font-bold mb-4">JubJub Signature Demo</h1>
 
+            {errorMessage && (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                    {errorMessage}
+                </div>
+            )}
+
             <div className="space-y-4">
-                <div className="space-y-2">
-                    <div className="space-y-4 border p-4 rounded">
-                        <h2 className="text-lg font-semibold">Mnemonic Phrase</h2>
-                        <button
-                            onClick={handleGenerateMnemonic}
-                            className="bg-green-500 text-white px-4 py-2 rounded"
-                        >
-                            Generate New Mnemonic
-                        </button>
+                {/* Key Generation Section */}
+                <div className="space-y-4 border p-4 rounded">
+                    <h2 className="text-lg font-semibold">Key Generation</h2>
+                    <button
+                        onClick={handleGenerateKeys}
+                        className="bg-blue-500 text-white px-4 py-2 rounded"
+                    >
+                        Generate New Keypair
+                    </button>
+                </div>
 
-                        <div>
-                            <label className="block text-sm font-medium">Mnemonic Phrase:</label>
-                            <textarea
-                                value={mnemonic}
-                                onChange={(e) => setMnemonic(e.target.value)}
-                                placeholder="Enter or paste your mnemonic phrase here (space-separated words)"
-                                className="text-black w-full p-2 border rounded h-24"
-                            />
+                {/* Mnemonic Section */}
+                <div className="space-y-4 border p-4 rounded">
+                    <h2 className="text-lg font-semibold">Mnemonic Phrase</h2>
+                    <button
+                        onClick={handleGenerateMnemonic}
+                        className="bg-green-500 text-white px-4 py-2 rounded"
+                    >
+                        Generate New Mnemonic
+                    </button>
+
+                    <div>
+                        <label className="block text-sm font-medium">Mnemonic Phrase:</label>
+                        <textarea
+                            value={mnemonic}
+                            onChange={(e) => setMnemonic(e.target.value)}
+                            placeholder="Enter or paste your mnemonic phrase here (space-separated words)"
+                            className="text-black w-full p-2 border rounded h-24"
+                        />
+                    </div>
+
+                    {formattedMnemonic && (
+                        <div className="bg-gray-100 p-4 rounded">
+                            <h3 className="font-medium mb-2">Formatted Mnemonic:</h3>
+                            <pre className="whitespace-pre-wrap text-black">{formattedMnemonic}</pre>
                         </div>
+                    )}
 
-                        {formattedMnemonic && (
-                            <div className="bg-gray-100 p-4 rounded">
-                                <h3 className="font-medium mb-2">Formatted Mnemonic:</h3>
-                                <pre className="whitespace-pre-wrap text-black">{formattedMnemonic}</pre>
-                            </div>
-                        )}
+                    <button
+                        onClick={handleCreateFromMnemonic}
+                        disabled={!mnemonic}
+                        className="bg-purple-500 text-white px-4 py-2 rounded disabled:opacity-50"
+                    >
+                        Create Keypair from Mnemonic
+                    </button>
+                </div>
 
+                {/* Key Bytes Section */}
+                <div className="space-y-4 border p-4 rounded">
+                    <h2 className="text-lg font-semibold">Create from Key Bytes</h2>
+
+                    <div>
+                        <label className="block text-sm font-medium">Private Key (hex):</label>
+                        <input
+                            type="text"
+                            value={privateKeyInput}
+                            onChange={(e) => setPrivateKeyInput(e.target.value)}
+                            placeholder="Enter private key as hex string (64 characters)"
+                            className="text-black w-full p-2 border rounded"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium">Public Key (hex):</label>
+                        <input
+                            type="text"
+                            value={publicKeyInput}
+                            onChange={(e) => setPublicKeyInput(e.target.value)}
+                            placeholder="Enter public key as hex string (64 characters)"
+                            className="text-black w-full p-2 border rounded"
+                        />
+                    </div>
+
+                    <div className="space-x-2">
                         <button
-                            onClick={handleCreateFromMnemonic}
-                            disabled={!mnemonic}
-                            className="bg-purple-500 text-white px-4 py-2 rounded disabled:opacity-50"
+                            onClick={handleCreateFromPrivateKey}
+                            disabled={!privateKeyInput}
+                            className="bg-orange-500 text-white px-4 py-2 rounded disabled:opacity-50"
                         >
-                            Create Keypair from Mnemonic
+                            Create from Private Key
+                        </button>
+                        <button
+                            onClick={handleCreateFromKeyBytes}
+                            disabled={!privateKeyInput || !publicKeyInput}
+                            className="bg-indigo-500 text-white px-4 py-2 rounded disabled:opacity-50"
+                        >
+                            Create from Both Keys
                         </button>
                     </div>
                 </div>
 
-                <div className="space-y-2">
+                {/* Current Keys Display */}
+                <div className="space-y-2 border p-4 rounded">
+                    <h2 className="text-lg font-semibold">Current Keys</h2>
                     <div>
                         <label className="block text-sm font-medium">Public Key:</label>
                         <input
@@ -196,47 +330,51 @@ export default function SignatureComponent() {
                     </div>
                 </div>
 
-                <div>
-                    <label className="block text-sm font-medium">Message:</label>
-                    <input
-                        type="text"
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        className="text-black w-full p-2 border rounded"
-                    />
-                </div>
-
-                <button
-                    onClick={handleSign}
-                    disabled={!keyPair || !message}
-                    className="bg-green-500 text-white px-4 py-2 rounded disabled:opacity-50"
-                >
-                    Sign Message
-                </button>
-
-                <div>
-                    <label className="block text-sm font-medium">Signature:</label>
-                    <input
-                        type="text"
-                        value={signature}
-                        readOnly
-                        className="text-black w-full p-2 border rounded"
-                    />
-                </div>
-
-                <button
-                    onClick={handleVerify}
-                    disabled={!signature}
-                    className="bg-purple-500 text-white px-4 py-2 rounded disabled:opacity-50"
-                >
-                    Verify Signature
-                </button>
-
-                {isValid !== null && (
-                    <div className={`p-2 rounded ${isValid ? 'text-black bg-green-100' : 'text-black bg-red-100'}`}>
-                        Signature is {isValid ? 'valid' : 'invalid'}
+                {/* Signing Section */}
+                <div className="space-y-4 border p-4 rounded">
+                    <h2 className="text-lg font-semibold">Signing & Verification</h2>
+                    <div>
+                        <label className="block text-sm font-medium">Message:</label>
+                        <input
+                            type="text"
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
+                            className="text-black w-full p-2 border rounded"
+                        />
                     </div>
-                )}
+
+                    <button
+                        onClick={handleSign}
+                        disabled={!keyPair || !message}
+                        className="bg-green-500 text-white px-4 py-2 rounded disabled:opacity-50"
+                    >
+                        Sign Message
+                    </button>
+
+                    <div>
+                        <label className="block text-sm font-medium">Signature:</label>
+                        <input
+                            type="text"
+                            value={signature}
+                            readOnly
+                            className="text-black w-full p-2 border rounded"
+                        />
+                    </div>
+
+                    <button
+                        onClick={handleVerify}
+                        disabled={!signature}
+                        className="bg-purple-500 text-white px-4 py-2 rounded disabled:opacity-50"
+                    >
+                        Verify Signature
+                    </button>
+
+                    {isValid !== null && (
+                        <div className={`p-2 rounded ${isValid ? 'text-black bg-green-100' : 'text-black bg-red-100'}`}>
+                            Signature is {isValid ? 'valid' : 'invalid'}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
