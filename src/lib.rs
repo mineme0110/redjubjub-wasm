@@ -6,7 +6,7 @@ use redjubjub::{Binding, Signature, SigningKey, VerificationKey};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct KeyPair {
     private: SigningKey<Binding>,
     public: VerificationKey<Binding>,
@@ -417,5 +417,196 @@ mod tests {
         // Both keypairs should be able to verify each other's signatures
         assert!(keypair_from_mnemonic.verify(message, &signature2));
         assert!(keypair_from_bytes.verify(message, &signature1));
+    }
+
+    #[test]
+    fn test_signed_unsigned_int_arrays_raw_value_conversion_valid_data() {
+        // Test hex values that are valid RedJubJub private keys
+        let hexes = vec![
+            "0000000000000000000000000000000000000000000000000000000000000000",
+            "0000000000000000000000000000000000000000000000000000000000000001",
+        ];
+
+        for hex in hexes {
+            // Convert hex string to bytes
+            let secret = hex::decode(hex).expect("Failed to decode hex");
+
+            // Create key from Vec<u8> (Buffer equivalent)
+            let key = KeyPair::from_private_key_bytes(&secret)
+                .expect("Failed to create key from Vec<u8>");
+
+            // Create key from Uint8Array equivalent (Vec<u8>)
+            let uint8_array = secret.clone();
+            let key_u8 = KeyPair::from_private_key_bytes(&uint8_array)
+                .expect("Failed to create key from Uint8Array equivalent");
+
+            // Create key from Int8Array equivalent (Vec<i8> converted to Vec<u8>)
+            let int8: Vec<i8> = secret.iter().map(|&b| b as i8).collect();
+            let int8_as_u8: Vec<u8> = int8.iter().map(|&b| b as u8).collect();
+            let key_i8 = KeyPair::from_private_key_bytes(&int8_as_u8)
+                .expect("Failed to create key from Int8Array equivalent");
+
+            // Verify all keys have the same raw values
+            assert_eq!(
+                key.private_key(),
+                key_u8.private_key(),
+                "Uint8Array conversion failed for hex: {}",
+                hex
+            );
+            assert_eq!(
+                key.private_key(),
+                key_i8.private_key(),
+                "Int8Array conversion failed for hex: {}",
+                hex
+            );
+            assert_eq!(
+                key.public_key(),
+                key_u8.public_key(),
+                "Public key mismatch for Uint8Array conversion, hex: {}",
+                hex
+            );
+            assert_eq!(
+                key.public_key(),
+                key_i8.public_key(),
+                "Public key mismatch for Int8Array conversion, hex: {}",
+                hex
+            );
+
+            // Test signing with the key
+            let msg = vec![0xB, 0xE, 0xE, 0xF];
+            let sig = key.sign(&msg);
+
+            // Verify signature is valid
+            assert!(
+                key.verify(&msg, &sig),
+                "Signature verification failed for hex: {}",
+                hex
+            );
+            assert!(
+                key_u8.verify(&msg, &sig),
+                "Uint8Array key signature verification failed for hex: {}",
+                hex
+            );
+            assert!(
+                key_i8.verify(&msg, &sig),
+                "Int8Array key signature verification failed for hex: {}",
+                hex
+            );
+
+            // Verify signature has expected length (64 bytes for RedJubJub)
+            assert_eq!(sig.len(), 64, "Signature length incorrect for hex: {}", hex);
+        }
+    }
+
+    #[test]
+    fn test_signed_unsigned_int_arrays_raw_value_conversion_invalid_data() {
+        // Test hex values that are NOT valid RedJubJub private keys
+        let hexes = vec![
+            "000000000000000000000000000000000000000000000000000000000000007F",
+            "0000000000000000000000000000000000000000000000000000000000000080",
+            "00000000000000000000000000000000000000000000000000000000000000FF",
+        ];
+
+        for hex in hexes {
+            // Convert hex string to bytes
+            let secret = hex::decode(hex).expect("Failed to decode hex");
+
+            // Create key from Vec<u8> (Buffer equivalent) - should fail
+            let key_result = KeyPair::from_private_key_bytes(&secret);
+            assert!(
+                key_result.is_err(),
+                "Expected failure for invalid hex: {}",
+                hex
+            );
+
+            // Create key from Uint8Array equivalent (Vec<u8>) - should fail
+            let uint8_array = secret.clone();
+            let key_u8_result = KeyPair::from_private_key_bytes(&uint8_array);
+            assert!(
+                key_u8_result.is_err(),
+                "Expected failure for Uint8Array with invalid hex: {}",
+                hex
+            );
+
+            // Create key from Int8Array equivalent (Vec<i8> converted to Vec<u8>) - should fail
+            let int8: Vec<i8> = secret.iter().map(|&b| b as i8).collect();
+            let int8_as_u8: Vec<u8> = int8.iter().map(|&b| b as u8).collect();
+            let key_i8_result = KeyPair::from_private_key_bytes(&int8_as_u8);
+            assert!(
+                key_i8_result.is_err(),
+                "Expected failure for Int8Array with invalid hex: {}",
+                hex
+            );
+
+            // Verify all conversions fail consistently
+            assert_eq!(
+                key_result.is_err(),
+                key_u8_result.is_err(),
+                "Uint8Array conversion should fail consistently for hex: {}",
+                hex
+            );
+            assert_eq!(
+                key_result.is_err(),
+                key_i8_result.is_err(),
+                "Int8Array conversion should fail consistently for hex: {}",
+                hex
+            );
+
+            // Verify error messages contain expected content
+            if let Err(e) = &key_result {
+                assert!(
+                    e.contains("Invalid private key") || e.contains("MalformedSigningKey"),
+                    "Expected error message to contain 'Invalid private key' or 'MalformedSigningKey' for hex: {}, got: {}",
+                    hex, e
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_signed_unsigned_int_arrays_raw_value_conversion_js_style() {
+        // ints [0, 01, 127, 128, 255] as hex
+        let hexes = [
+            "0000000000000000000000000000000000000000000000000000000000000000",
+            "0000000000000000000000000000000000000000000000000000000000000001",
+            "000000000000000000000000000000000000000000000000000000000000007F",
+            "0000000000000000000000000000000000000000000000000000000000000080",
+            "00000000000000000000000000000000000000000000000000000000000000FF",
+        ];
+
+        for hex in hexes {
+            let secret = hex::decode(hex).unwrap();
+            // Try to create a key from the raw bytes
+            let key = KeyPair::from_private_key_bytes(&secret);
+            // Try from i8 array as u8
+            let int8: Vec<i8> = secret.iter().map(|&b| b as i8).collect();
+            let int8_as_u8: Vec<u8> = int8.iter().map(|&b| b as u8).collect();
+            let key_i8 = KeyPair::from_private_key_bytes(&int8_as_u8);
+
+            // Both should succeed or fail together
+            assert_eq!(
+                key.is_ok(),
+                key_i8.is_ok(),
+                "i8/u8 conversion mismatch for hex {}",
+                hex
+            );
+
+            if let (Ok(key), Ok(key_i8)) = (key, key_i8) {
+                assert_eq!(key.private_key(), key_i8.private_key());
+                assert_eq!(key.public_key(), key_i8.public_key());
+
+                // Test signing
+                let msg = b"BEEF";
+                let sig = key.sign(msg);
+                assert_eq!(sig.len(), 64);
+                assert!(key.verify(msg, &sig));
+            } else {
+                // It's OK for some keys to be invalid!
+                println!(
+                    "Key for hex {} is not a valid RedJubJub key (expected for some patterns)",
+                    hex
+                );
+            }
+        }
     }
 }
