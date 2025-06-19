@@ -1,6 +1,6 @@
 # RedJubjub WebAssembly Demo
 
-A web application demonstrating RedJubjub curve signatures using Rust WebAssembly and Next.js, with support for mnemonic phrase-based key generation.
+A web application demonstrating RedJubjub curve signatures using Rust WebAssembly and Next.js, with support for mnemonic phrase-based key generation and key creation from bytes.
 
 ## Project Structure 
 ```
@@ -26,6 +26,9 @@ project/
 - Sign messages using RedJubjub signatures
 - Verify signatures
 - Generate and use BIP39 mnemonic phrases
+- **Create keypairs from private key bytes**
+- **Create keypairs from both private and public key bytes**
+- **Create verification-only keypairs from public key bytes**
 - Display public and private keys in hex format
 - TypeScript support for type safety
 
@@ -105,6 +108,23 @@ console.log(formattedMnemonic);
 const keypairFromMnemonic = KeyPair.from_mnemonic(mnemonic);
 ```
 
+### Creating Keys from Bytes
+
+```typescript
+// Create a keypair from private key bytes (32 bytes)
+const privateKeyBytes = Buffer.from('your_private_key_hex_string', 'hex');
+const keypairFromPrivate = KeyPair.from_private_key_bytes(privateKeyBytes);
+
+// Create a keypair from both private and public key bytes
+const privateKeyBytes = Buffer.from('your_private_key_hex_string', 'hex');
+const publicKeyBytes = Buffer.from('your_public_key_hex_string', 'hex');
+const keypairFromBoth = KeyPair.from_key_bytes(privateKeyBytes, publicKeyBytes);
+
+// Create a verification-only keypair from public key bytes
+const publicKeyBytes = Buffer.from('your_public_key_hex_string', 'hex');
+const verificationKeypair = KeyPair.from_public_key_only(publicKeyBytes);
+```
+
 ### Signing and Verification
 
 ```typescript
@@ -129,7 +149,6 @@ export function SignatureComponent() {
   const [privateKey, setPrivateKey] = useState<string>('');
   const [message, setMessage] = useState<string>('');
   const [signature, setSignature] = useState<string>('');
-  const [mnemonic, setMnemonic] = useState<string>('');
 
   useEffect(() => {
     // Initialize WASM
@@ -150,13 +169,29 @@ export function SignatureComponent() {
     setSignature('');
   };
 
-  const generateMnemonic = () => {
-    const newMnemonic = KeyPair.generate_mnemonic();
-    setMnemonic(newMnemonic);
-    const newKeypair = KeyPair.from_mnemonic(newMnemonic);
-    setKeypair(newKeypair);
-    setPublicKey(Buffer.from(newKeypair.public_key()).toString('hex'));
-    setPrivateKey(Buffer.from(newKeypair.private_key()).toString('hex'));
+  const createFromPrivateKey = (privateKeyHex: string) => {
+    try {
+      const privateKeyBytes = Buffer.from(privateKeyHex, 'hex');
+      const newKeypair = KeyPair.from_private_key_bytes(privateKeyBytes);
+      setKeypair(newKeypair);
+      setPublicKey(Buffer.from(newKeypair.public_key()).toString('hex'));
+      setPrivateKey(Buffer.from(newKeypair.private_key()).toString('hex'));
+    } catch (error) {
+      console.error('Error creating keypair from private key:', error);
+    }
+  };
+
+  const createFromKeyBytes = (privateKeyHex: string, publicKeyHex: string) => {
+    try {
+      const privateKeyBytes = Buffer.from(privateKeyHex, 'hex');
+      const publicKeyBytes = Buffer.from(publicKeyHex, 'hex');
+      const newKeypair = KeyPair.from_key_bytes(privateKeyBytes, publicKeyBytes);
+      setKeypair(newKeypair);
+      setPublicKey(Buffer.from(newKeypair.public_key()).toString('hex'));
+      setPrivateKey(Buffer.from(newKeypair.private_key()).toString('hex'));
+    } catch (error) {
+      console.error('Error creating keypair from key bytes:', error);
+    }
   };
 
   const signMessage = () => {
@@ -177,14 +212,40 @@ export function SignatureComponent() {
   return (
     <div>
       <button onClick={generateNewKeypair}>Generate New Keypair</button>
-      <button onClick={generateMnemonic}>Generate Mnemonic</button>
       
-      {mnemonic && (
-        <div>
-          <h3>Mnemonic Phrase:</h3>
-          <pre>{KeyPair.format_mnemonic(mnemonic)}</pre>
-        </div>
-      )}
+      <div>
+        <h3>Create from Private Key:</h3>
+        <input
+          type="text"
+          placeholder="Enter private key hex"
+          onChange={(e) => createFromPrivateKey(e.target.value)}
+        />
+      </div>
+
+      <div>
+        <h3>Create from Key Bytes:</h3>
+        <input
+          type="text"
+          placeholder="Private key hex"
+          onChange={(e) => {
+            const publicKeyInput = document.getElementById('publicKeyInput') as HTMLInputElement;
+            if (publicKeyInput) {
+              createFromKeyBytes(e.target.value, publicKeyInput.value);
+            }
+          }}
+        />
+        <input
+          id="publicKeyInput"
+          type="text"
+          placeholder="Public key hex"
+          onChange={(e) => {
+            const privateKeyInput = document.getElementById('privateKeyInput') as HTMLInputElement;
+            if (privateKeyInput) {
+              createFromKeyBytes(privateKeyInput.value, e.target.value);
+            }
+          }}
+        />
+      </div>
 
       <div>
         <h3>Public Key:</h3>
@@ -218,6 +279,65 @@ export function SignatureComponent() {
 }
 ```
 
+## Key Creation Methods
+
+### 1. `from_private_key_bytes(private_key_bytes: &[u8]) -> Result<KeyPair, String>`
+
+Creates a complete KeyPair from a 32-byte private key. The public key is automatically derived from the private key.
+
+**Parameters:**
+- `private_key_bytes`: A byte array of exactly 32 bytes representing the private key
+
+**Returns:**
+- `Ok(KeyPair)` if successful
+- `Err(String)` if the private key is invalid or wrong length
+
+**Example:**
+```typescript
+const privateKeyHex = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+const privateKeyBytes = Buffer.from(privateKeyHex, 'hex');
+const keypair = KeyPair.from_private_key_bytes(privateKeyBytes);
+```
+
+### 2. `from_key_bytes(private_key_bytes: &[u8], public_key_bytes: &[u8]) -> Result<KeyPair, String>`
+
+Creates a KeyPair from both private and public key bytes. This method validates that the public key corresponds to the private key.
+
+**Parameters:**
+- `private_key_bytes`: A byte array of exactly 32 bytes representing the private key
+- `public_key_bytes`: A byte array of exactly 32 bytes representing the public key
+
+**Returns:**
+- `Ok(KeyPair)` if successful and keys match
+- `Err(String)` if keys are invalid, wrong length, or don't match
+
+**Example:**
+```typescript
+const privateKeyHex = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+const publicKeyHex = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
+const privateKeyBytes = Buffer.from(privateKeyHex, 'hex');
+const publicKeyBytes = Buffer.from(publicKeyHex, 'hex');
+const keypair = KeyPair.from_key_bytes(privateKeyBytes, publicKeyBytes);
+```
+
+### 3. `from_public_key_only(public_key_bytes: &[u8]) -> Result<KeyPair, String>`
+
+Creates a verification-only KeyPair from public key bytes. This KeyPair can only verify signatures, not create them.
+
+**Parameters:**
+- `public_key_bytes`: A byte array of exactly 32 bytes representing the public key
+
+**Returns:**
+- `Ok(KeyPair)` if successful
+- `Err(String)` if the public key is invalid or wrong length
+
+**Example:**
+```typescript
+const publicKeyHex = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
+const publicKeyBytes = Buffer.from(publicKeyHex, 'hex');
+const verificationKeypair = KeyPair.from_public_key_only(publicKeyBytes);
+```
+
 ## Common Issues and Solutions
 
 1. **WASM Loading Issues**
@@ -239,6 +359,15 @@ export function SignatureComponent() {
    - The WASM module handles memory cleanup automatically
    - No manual memory management required
 
+4. **Key Length Validation**
+   - Private keys must be exactly 32 bytes (64 hex characters)
+   - Public keys must be exactly 32 bytes (64 hex characters)
+   - Invalid lengths will return an error
+
+5. **Key Mismatch Errors**
+   - When using `from_key_bytes()`, ensure the public key corresponds to the private key
+   - The method will validate this automatically
+
 ## Development
 
 To make changes to the Rust code:
@@ -257,9 +386,9 @@ cp -r pkg/* jubjub-signature-app/src/wasm/
 ## Security Considerations
 
 - Private keys should be handled securely and never exposed in logs or error messages
-- When using in a web browser, consider the security implications of storing private keys
-- Use appropriate key storage mechanisms for your use case
-- Consider using a secure key management system for production environments
+- When creating keys from bytes, validate the input format and length
+- The `from_key_bytes()` method provides additional security by validating key correspondence
+- Use `from_public_key_only()` when you only need verification capabilities
 
 ## License
 
